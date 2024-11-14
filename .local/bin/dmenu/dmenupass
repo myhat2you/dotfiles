@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# This script is the SUDO_ASKPASS variable, meaning that it will be used as a
+# password prompt if needed.
+
+# DMenu font and colorsceme
+font="$(xrdb -get dmenu.font)"
+color_bg="$(xrdb -get background)"
+color_fg="$(xrdb -get foreground)"
+color_r="$(xrdb -get color1)"
+
+dmenu -fn $font -nb $color_bg -nf $color_r -sb $color_r -sf $color_fg -P -p "$1" <&- && echo

@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# Set as a cron job to check for new RSS entries for newsboat.
+# If newsboat is open, sends it an "R" key to refresh.
+
+# export dbus address for dunst to work with cron
+PID=$(pgrep startx)
+export DBUS_SESSION_BUS_ADDRESS=$(grep -z DBUS_SESSION_BUS_ADDRESS /proc/$PID/environ|cut -d= -f2-|sed 's/\x0//g')
+
+/usr/bin/notify-send " Updating RSS feeds..."
+
+pgrep -f newsboat$ && /usr/bin/xdotool key --window "$(/usr/bin/xdotool search --name "^newsboat$")" R && exit
+
+echo "$packages" > /tmp/newsupdate
+pkill -RTMIN+5 "${STATUSBAR:-dwmblocks}"
+/usr/bin/newsboat -x reload
+rm -f /tmp/newsupdate
+pkill -RTMIN+5 "${STATUSBAR:-dwmblocks}"
+/usr/bin/notify-send -u low " RSS feed update complete."

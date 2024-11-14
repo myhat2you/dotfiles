@@ -1,0 +1,44 @@
+!! Suckless Terminal
+st.termname: st-256color
+st.borderpx: 2
+st.alpha: 0.8
+st.alphaOffset: 0.15
+spterm.alpha: 0.8
+spterm.alphaOffset: 0.15
+
+!! Dmenu
+dmenu.font: monospace:size=10:bold
+
+!! NSXIV
+Nsxiv.bar.background: #4D6DD0
+Nsxiv.bar.font:       monospace:size=12
+
+/* name     dark  light */
+/* black    0     8     */
+/* red      1     9     */
+/* green    2     10    */
+/* orange   3     11    */
+/* blue     4     12    */
+/* magenta  5     13    */
+/* cyan     6     14    */
+/* white    7     15    */
+
+!! Hex colorscheme */
+*.foreground:    #F0F0F0
+*.background:    #181617
+*.color0:        #1C1C1C
+*.color8:        #6E6E6E
+*.color1:        #D42050
+*.color9:        #FF3565
+*.color2:        #00BB8F
+*.color10:       #10E0B0
+*.color3:        #DD4D64
+*.color11:       #F05B68
+*.color4:        #4D6DD0
+*.color12:       #5C8EF6
+*.color5:        #DA3060
+*.color13:       #FF466A
+*.color6:        #10A0C8
+*.color14:       #10D0E8
+*.color7:        #B0B0B0
+*.color15:       #F0F0F0
