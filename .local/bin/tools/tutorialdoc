@@ -1,0 +1,3 @@
+#!/bin/sh
+
+mdp ~/.local/src/dwm/mars.md -f

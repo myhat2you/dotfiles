@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# Syncs repositories and downloads updates, meant to be run as a cronjob.
+
+# export dbus address for dunst to work with cron
+PID=$(pgrep startx)
+export DBUS_SESSION_BUS_ADDRESS=$(grep -z DBUS_SESSION_BUS_ADDRESS /proc/$PID/environ|cut -d= -f2-|sed 's/\x0//g')
+
+notify-send " Repository Sync" "Checking for package updates..."
+
+echo "$packages" > /tmp/pacupdate && pkill -RTMIN+3 "${STATUSBAR:-dwmblocks}"
+
+sudo pacman -Syyuw --noconfirm || notify-send -u critical " Error downloading updates." \
+"Check your internet connection, if pacman is already running, or run update manually to see errors."
+
+rm -f /tmp/pacupdate && pkill -RTMIN+3 "${STATUSBAR:-dwmblocks}"
+
+if pacman -Qu | grep -v "\[ignored\]"
+then
+	notify-send -u "low" " Repository Sync" "Updates available.\nClick () to update."
+else
+	notify-send -u "low" " Repository Sync" "Sync complete, no new packages."
+fi

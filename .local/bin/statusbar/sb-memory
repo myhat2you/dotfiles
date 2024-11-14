@@ -1,0 +1,24 @@
+#!/bin/sh
+
+icon=""
+color_b="$(xrdb -get color12)"
+color_o="$(xrdb -get color11)"
+color_r="$(xrdb -get color9)"
+
+# Get current and maximum RAM usage in GB
+read ram_now ram_max <<<$(free --giga | awk '/^Mem:/ {print $3, $2}')
+
+# Calculate the percentage of RAM being used
+ram_percentage=$((ram_now * 100 / ram_max))
+
+case $ram_percentage in
+    [0-4]*) color=$color_b ;; # Norm (00-50%) 
+    [5-7]*) color=$color_o ;; # High (50-80%)
+    *)      color=$color_r ;; # Crit (>= 80%) 
+esac
+
+case $BUTTON in
+	1) notify-send -a "button" "$icon Memory hogs" "$(ps axch -o cmd:15,%mem --sort=-%mem | head)" ;;
+esac
+
+echo -e "^c$color^$icon^d^ $ram_now"GB

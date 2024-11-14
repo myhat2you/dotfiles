@@ -1,0 +1,35 @@
+[global]
+    monitor = 0
+    follow = keyboard
+    width = 345
+    offset = 0x21
+    padding = 2
+    horizontal_padding = 2
+    transparency = 30
+    font = Monospace 12
+    format = "<b>%s</b>\n%b"
+
+[urgency_low]
+    background  = "#10E0B0"
+    foreground  = "#FAFAFA"
+    frame_color = "#00BB8F"
+    timeout = 5
+
+[urgency_normal]
+    background  = "#5C8EF6"
+    foreground  = "#FAFAFA"
+    frame_color = "#4D6DD0"
+    timeout = 5
+
+[urgency_critical]
+    background  = "#F05B68"
+    foreground  = "#FAFAFA"
+    frame_color = "#DD4058"
+    timeout = 0
+
+[custom_notification]
+    appname = "button"
+    background  = "#181617"
+    foreground  = "#F0F0F0"
+    frame_color = "#B0B0B0"
+    timeout = 10

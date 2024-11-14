@@ -1,0 +1,8 @@
+#!/bin/sh
+
+case $BUTTON in
+  1) notify-send -a "button" "This Month" "$(cal | sed "s/\<$(date +'%e'|tr -d ' ')\>/<b><span color='red'>&<\/span><\/b>/")" && notify-send -a "button" "Appointments" "$(calcurse -d3)" ;;
+	3) setsid -f "$TERMINAL" -e calcurse ;;
+esac
+
+date "+%d/%m/%y (%a) %I:%M%p"

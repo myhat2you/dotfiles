@@ -1,0 +1,19 @@
+#!/bin/sh
+
+filter() { sed "/^volume:/d;/\\[paused\\].*/d;/\\[playing\\].*/d;/^ERROR/Q" | paste -sd ' ' -;}
+
+# display nothing if playlist is empty
+[[ "$(mpc status %length%)" == 0 ]] && exit
+
+pidof -x sb-mpdup >/dev/null 2>&1 || nohup sb-mpdup >/dev/null 2>&1 &
+
+
+# check if title is too long or empty
+status="$(mpc status | filter)"
+[[ ${#status} -ge 32 ]] && status="${status:0:29}..."
+[[ ${#status} -eq 0  ]] && status="..."
+
+# change color of paused state
+state="$(mpc status %state%)"
+[[ $state == "paused"  ]] && echo -e "^c#666666^${status:0:32}^d^"
+[[ $state == "playing" ]] && echo -e "${status:0:32}"

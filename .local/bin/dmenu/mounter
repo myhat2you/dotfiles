@@ -1,0 +1,100 @@
+#!/bin/bash
+# Mounts Android Phones, USB, and encrypted drives.
+
+font="$(xrdb -get dmenu.font)"
+color_b="$(xrdb -get background)"
+color_r="$(xrdb -get color1)"
+color_w="$(xrdb -get color15)"
+
+IFS=$'\n'
+
+# Function for escaping cell-phone names.
+escape(){ echo "$@" | iconv -cf UTF-8 -t ASCII//TRANSLIT | tr -d '[:punct:]' | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | sed "s/-\+/-/g;s/\(^-\|-\$\)//g" ;}
+
+# Check for phones.
+phones="$(simple-mtpfs -l 2>/dev/null | sed "s/^/ /")"
+mountedphones="$(grep "simple-mtpfs" /etc/mtab)"
+[ -n "$mountedphones" ] && phones="$(for phone in $phones; do
+	for mounted in $mountedphones; do
+		escphone="$(escape "$phone")"
+		[[ "$mounted" =~ "$escphone" ]] && break 1
+	done && continue 1
+	echo "$phone"
+done)"
+
+# Check for drives.
+lsblkoutput="$(lsblk -rpo "uuid,name,type,size,label,mountpoint,fstype")"
+# Get all LUKS drives (updated logic for unopened LUKS drives)
+unopenedluks=$(lsblk -rpo NAME,TYPE,FSTYPE,MOUNTPOINT | awk '/crypto_LUKS/ && $4 == "" {print $1}' | awk '{printf " %s\n", $1}')
+# Get all normal, non-encrypted or decrypted partitions that are not mounted.
+normalparts="$(echo "$lsblkoutput" | grep -v crypto_LUKS | grep 'part\|rom\|crypt' | sed "s/^/ /" | sed "s/ /:/g" | awk -F':' '$7==""{printf "%s %s (%s) %s\n",$1,$3,$5,$6}')"
+
+# Combine all drives.
+alldrives="$(echo "$phones
+$unopenedluks
+$normalparts" | sed "/^$/d;s/ *$//")"
+
+# Quit the script if no drives are found.
+set -e
+test -n "$alldrives"
+
+# dmenu for user choice.
+chosen="$(echo "$alldrives" | 
+  dmenu -p "Mount which drive?" -i -fn $font -nb $color_b -nf $color_w -sb $color_r -sf $color_w)"
+
+# Function to prompt for a mount point.
+getmount(){
+	mp="$(find /mnt /media /mount /home -maxdepth 1 -type d 2>/dev/null | 
+    dmenu -i -p "Mount this drive where?" -fn $font -nb $color_b -nf $color_w -sb $color_r -sf $color_w)"
+	test -n "$mp"
+	[ -d "$mp" ] || sudo -A mkdir -p "$mp" || { notify-send "Error" "Failed to create mount point."; exit 1; }
+}
+
+attemptmount(){
+	sudo -A mount "$chosen" || return 1
+	notify-send " Drive Mounted." "$chosen mounted."
+	exit
+}
+
+case "$chosen" in
+	*)
+		chosen="${chosen% *}"
+		chosen="${chosen:2}"	# This is a bashism.
+		parttype="$(echo "$lsblkoutput" | grep "$chosen")"
+		attemptmount || getmount
+		case "${parttype##* }" in
+			vfat) sudo -A mount -t vfat "$chosen" "$mp" -o rw,umask=0000 ;;
+			ext4|btrfs) sudo -A mount "$chosen" "$mp" ;;
+			*) sudo -A mount "$chosen" "$mp" -o uid="$(id -u)",gid="$(id -g)" ;;
+		esac
+		notify-send " Drive Mounted." "$chosen mounted to $mp."
+		;;
+
+	*)
+		chosen="${chosen#* }"
+		num=1
+		while [ -e "/dev/mapper/usb$num" ]; do
+			num=$((num + 1))
+		done
+		${TERMINAL:-st} -n floatterm -g 60x1 -e sudo cryptsetup open "$chosen" "usb$num"
+		test -b "/dev/mapper/usb$num" || { notify-send "Error" "Decrypted device not found."; exit 1; }
+		getmount
+		fstype=$(lsblk -no FSTYPE "/dev/mapper/usb$num")
+		case "$fstype" in
+			vfat) mount_opts="-o rw,umask=0000" ;;
+			ext4|btrfs) mount_opts="" ;;
+			*) mount_opts="-o uid=$(id -u),gid=$(id -g)" ;;
+		esac
+		sudo -A mount "/dev/mapper/usb$num" "$mp" $mount_opts || { notify-send "Error" "Mount failed."; exit 1; }
+		notify-send " Decrypted Drive Mounted" "$chosen decrypted and mounted to $mp."
+		;;
+
+	*)
+		notify-send " Note" "Remember to allow file access on your phone now."
+		getmount
+		number="${chosen%%:*}"
+		number="${chosen#* }"
+		sudo -A simple-mtpfs -o allow_other -o fsname="simple-mtpfs-$(escape "$chosen")" --device "$number" "$mp"
+		notify-send " Android Mounted." "Android device mounted to $mp."
+		;;
+esac
