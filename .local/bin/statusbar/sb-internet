@@ -1,0 +1,43 @@
+#!/bin/sh
+
+color_g="$(xrdb -get color2)"
+color_b="$(xrdb -get color12)"
+color_o="$(xrdb -get color11)"
+color_r="$(xrdb -get color9)"
+
+ip_pub="$(curl -4 ifconfig.me --silent --connect-timeout 1)"
+ip_loc="$(ip -o -4 address show | awk 'NR==2 { gsub(/\/.*/, "", $4); print $4 }')"
+ip_dns="$(cat /etc/resolv.conf  | awk 'NR==2 {print $2}')"
+vpn_status="$(systemctl status openvpn-client@client 2>&1 | grep Active | awk '{print $2}')"
+
+# Check local and online connections
+if [[ ! $ip_loc ]]; then
+    echo -e "^c$color_r^[ N/A ]^d^" && exit
+elif [[ $(ping 1.1.1.1 -c 1 -W 1 | grep '100%') ]]; then
+    echo -e "^c$color_o^[ ... ]^d^" && exit
+fi
+
+# Check DNS status
+if [[ $ip_dns == "1.1.1.1" ]] || [[ $ip_dns == "1.0.0.1" ]]; then
+    icon=""
+    color=$color_b
+else
+    icon=""
+    color=$color_o
+    notify-send -u normal " DNS error" "[$ip_dns]"
+fi
+
+# Check VPN status and routing
+if [[ $vpn_st == "active" ]]; then
+  icon=""
+  color=$color_g
+  [[ $(ip route show | grep -q "0.0.0.0.* dev tun") ]] || notify-send -u critical 
+  " VPN down"
+fi
+
+case $BUTTON in
+	1) notify-send -a "button" "  $ip_pub" && 
+    echo "$ip_pub" | xclip -selection clipboard
+esac
+
+echo -e "^c$color^$icon^d^ $ip_loc"

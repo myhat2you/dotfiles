@@ -1,0 +1,37 @@
+#!/bin/sh
+
+icon=""
+color_b="$(xrdb -get color12)"
+color_o="$(xrdb -get color11)"
+color_r="$(xrdb -get color9)"
+color_R="$(xrdb -get color1)"
+
+# Get initial CPU temperature
+get_temp() {
+    echo $(( $(cat /sys/class/hwmon/hwmon*/temp1_input 2>/dev/null || echo 0) / 1000 ))
+}
+
+warning() {
+    notify-send -u critical "$icon $1°C"
+    echo -e "^c$color_R^$icon $1°C^d^"
+    sleep 5s
+}
+
+temp=$(get_temp)
+
+case $temp in
+    [0-5][0-9]) color=$color_b;;    # Low  (00-60°C)
+    [6-7][0-9]) color=$color_o;;    # Norm (60-80°C)
+    [8-8][0-9]) color=$color_r;;    # High (80-90°C)
+    [9-9][0-5]) color=$color_R;;    # Crit (90-95°C)
+    *) while [[ $temp -ge 95 ]]; do # Crit (>= 95°C)
+           warning $temp
+           temp=$(get_temp)
+       done;;
+esac
+
+case $BUTTON in
+    1) notify-send -a "button" " CPU hogs" "$(ps axch -o cmd:15,%cpu --sort=-%cpu | head)\\n(100% per core)" ;;
+esac
+
+echo -e "^c$color^$icon^d^ $temp°C"

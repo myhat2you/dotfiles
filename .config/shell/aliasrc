@@ -1,0 +1,102 @@
+#!/bin/sh
+
+#-----------------------------------------------------------#
+# Aliases for applications based on availability or configs #
+#-----------------------------------------------------------#
+
+# Use neovim for vim if present
+[ -x "$(command -v nvim)" ] && alias vim="nvim" vimdiff="nvim -d"
+
+# Set startx to use $XINITRC if the file exists
+[ -f "$XINITRC" ] && alias startx="startx $XINITRC"
+
+# Set mbsync to use custom configuration if $MBSYNCRC exists
+[ -f "$MBSYNCRC" ] && alias mbsync="mbsync -c $MBSYNCRC"
+
+#-----------------------------------------------------------#
+# System commands that do not require sudo                  #
+#-----------------------------------------------------------#
+
+for command in mount umount sv pacman updatedb su shutdown poweroff reboot; do
+	alias $command="sudo $command"
+done
+unset command  # Cleanup
+
+#-----------------------------------------------------------#
+# Utility functions                                         #
+#-----------------------------------------------------------#
+
+# Function to edit scripts in ~/.local/bin with fzf selection
+se() {
+	choice="$(find ~/.local/bin -mindepth 1 -printf '%P\n' | fzf)"
+	[ -f "$HOME/.local/bin/$choice" ] && $EDITOR "$HOME/.local/bin/$choice"
+}
+
+#-----------------------------------------------------------#
+# Default verbosity and useful options for common commands  #
+#-----------------------------------------------------------#
+
+alias \
+	cp="cp -iv" \
+	mv="mv -iv" \
+	rm="rm -vI" \
+	bc="bc -ql" \
+	mkd="mkdir -pv" \
+	rsync="rsync -vrPlu" \
+	yt="yt-dlp --embed-metadata -i" \
+	yta="yt -x -f bestaudio/best" \
+	ytt="yt --skip-download --write-thumbnail" \
+	ffmpeg="ffmpeg -hide_banner" \
+	fzf="find . | fzf" \
+	vifm="vifm ./" \
+	x="nsxiv -pft"
+
+#-----------------------------------------------------------#
+# Colorize commands when possible                           #
+#-----------------------------------------------------------#
+
+# Use lsd for `ls` if available, otherwise default to `ls` with color
+if [ -x "$(command -v lsd)" ]; then
+	alias ls="lsd --group-directories-first"
+else
+	alias ls="ls -hN --color=auto --group-directories-first"
+fi
+
+alias \
+	lsp="pacman -Qett --color=always | less" \
+	grep="grep --color=auto" \
+	diff="diff --color=auto" \
+	ccat="highlight --out-format=ansi" \
+	ip="ip -color=auto"
+
+#-----------------------------------------------------------#
+# Common command abbreviations                              #
+#-----------------------------------------------------------#
+
+alias \
+	ka="killall" \
+	g="git" \
+	ytv="youtube-viewer" \
+	sdn="shutdown -h now" \
+	e="$EDITOR" \
+	v="$EDITOR" \
+	copy="xclip -selection clipboard" \
+	z="zathura"
+
+#-----------------------------------------------------------#
+# Hacking                                                   #
+#-----------------------------------------------------------#
+
+alias \
+	msf="tmux new-session -d 'msfconsole'" \
+	sshv="ssh hatter@139.162.198.179 -p 7950" \
+	sshw="ssh hatter@88.80.184.113 -p 8268"
+
+#-----------------------------------------------------------#
+# Misc                                                   #
+#-----------------------------------------------------------#
+
+# Refresh custom shortcuts for file navigation
+alias ref="shortcuts >/dev/null; 
+  source ${XDG_CONFIG_HOME:-$HOME/.config}/shell/shortcutrc; 
+  source ${XDG_CONFIG_HOME:-$HOME/.config}/shell/zshnameddirrc"

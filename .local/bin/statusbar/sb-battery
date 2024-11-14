@@ -1,0 +1,42 @@
+#!/bin/sh
+# Print all batteries, their percentage, and a representative emoji.
+# Notify a warning when battery is critically low.
+
+# Define colors using xrdb to fetch color codes.
+color_g="$(xrdb -get color2)"
+color_b="$(xrdb -get color12)"
+color_o="$(xrdb -get color11)"
+color_r="$(xrdb -get color9)"
+
+# Define charge level emojis.
+charge_icons=("" "" "" "" "")
+
+# Loop through all attached batteries.
+for battery in /sys/class/power_supply/BAT?*; do
+    # Ensure the battery directory exists.
+    [ -e "$battery" ] || continue
+
+    capacity=$(<"$battery/capacity")
+    charging_status=$(<"$battery/status")
+
+    # Determine the emoji and color based on capacity.
+    case "$capacity" in
+        100)    color="$color_g"; icon="${charge_icons[4]}";; # Full (100%) 
+        [9-9]*) color="$color_g"; icon="${charge_icons[3]}";; # High (90-99%)
+        [6-8]*) color="$color_b"; icon="${charge_icons[3]}";; # High (60-90%)
+        [4-5]*) color="$color_b"; icon="${charge_icons[2]}";; # Mid  (40-60%)
+        [1-3]*) color="$color_o"; icon="${charge_icons[1]}";; # Low  (10-40%)
+        [0-9])  color="$color_r"; icon="${charge_icons[0]}";; # Crit (00-10%)
+    esac
+
+    # Add charging symbol if the battery is charging.
+    if [ "$charging_status" != "Discharging" ]; then
+        cable=""
+    elif [ "$capacity" -le 9 ]; then
+        # Notify when battery is critically low and discharging.
+        notify-send -u critical " Warning: $capacity% battery"
+    fi
+
+    # Print the formatted battery status.
+    printf "^c%s^%s^d^ %d%% ^c%s^%s ^d^\n" "$color" "$icon" "$capacity" "$color" "$cable"
+done

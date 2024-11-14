@@ -1,0 +1,44 @@
+#!/bin/sh
+# Status bar module for disk space
+# $1 should be the drive mountpoint, otherwise assumed /home.
+
+icon=""
+color_b="$(xrdb -get color12)"
+color_o="$(xrdb -get color11)"
+color_r="$(xrdb -get color9)"
+
+# Function to get the formatted disk space info for all drives
+get_disk_info() {
+    printf "Drive\tUsed\tSize\tUsed\n"
+    for drive in "${drives[@]::${#drives[@]}-1}"; do
+        df -h "$drive" | awk 'NR==2 {printf "%s\t%s\t%s\t%s\n", $6, $3, $2, $5}'
+    done
+}
+
+# Main drive location and data
+location=${1:-/home}
+read -r dused dsize dperc < <(df -h "$location" | awk 'NR==2 {print $3, $2, $5}' | sed 's/%//')
+
+# Ensure location is valid
+[ -d "$location" ] || exit
+
+# List of drives for notification, filtered with simple checks
+drives=("/" "/boot" "/home")
+for dir in /mnt /media; do
+    [[ -d "$dir" ]] && drives+=("$dir")
+done
+
+# Display detailed information on button click
+case $BUTTON in
+    1) notify-send -a "button" " Disk space" "$(get_disk_info)" ;;
+esac
+
+# Choose color based on disk usage percentage
+case $dperc in
+    [0-6]*) color=$color_b;; # Norm (00-70°C)
+    [7-8]*) color=$color_o;; # High (70-90°C)
+    *)      color=$color_r;; # Crit (>= 90°C)
+esac
+
+# Output for status bar
+echo -e "^c$color^$icon^d^ $dused/$dsize"
