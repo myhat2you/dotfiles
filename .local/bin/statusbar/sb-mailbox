@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# Displays number of unread mail and an loading icon if updating.
+# When clicked, brings up `neomutt`.
+
+color_g="$(xrdb -get color2)"
+color_o="$(xrdb -get color11)"
+
+icon_sync="^c$color_g^^d^"
+icon_mail="^c$color_o^^d^"
+
+case $BUTTON in
+	1) setsid -f "$TERMINAL" -e neomutt ;;
+	2) setsid -f mw -Y >/dev/null ;;
+	3) notify-send -a "button" " Mail module" "\- Shows unread mail
+- Shows  if syncing mail
+- Left click opens neomutt
+- Middle click syncs mail" ;;
+esac
+
+unread="$(find "${XDG_DATA_HOME:-$HOME/.local/share}"/mail/*/[Ii][Nn][Bb][Oo][Xx]/new/* -type f | wc -l 2>/dev/null)"
+
+pidof mbsync >/dev/null 2>&1 && icon="$icon_sync "
+
+[ "$unread" = "0" ] && [ "$icon" = "" ] || echo "$icon_mail $unread"

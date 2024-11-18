@@ -1,0 +1,70 @@
+" vim: filetype=vim
+"========================================================| Home
+map gh :cd /home/hatter<CR>
+map th <tab>:cd /home/hatter<CR><tab>
+map Mh <tab>:cd /home/hatter<CR><tab>:mo<CR>
+map Yh <tab>:cd /home/hatter<CR><tab>:co<CR> 
+"========================================================| Downloads
+map gd :cd /home/hatter/Downloads<CR>
+map td <tab>:cd /home/hatter/Downloads<CR><tab>
+map Md <tab>:cd /home/hatter/Downloads<CR><tab>:mo<CR>
+map Yd <tab>:cd /home/hatter/Downloads<CR><tab>:co<CR> 
+"========================================================| Documents
+map gD :cd /home/hatter/Documents<CR>
+map tD <tab>:cd /home/hatter/Documents<CR><tab>
+map MD <tab>:cd /home/hatter/Documents<CR><tab>:mo<CR>
+map YD <tab>:cd /home/hatter/Documents<CR><tab>:co<CR> 
+"========================================================| Music
+map gm :cd /home/hatter/Music<CR>
+map tm <tab>:cd /home/hatter/Music<CR><tab>
+map Mm <tab>:cd /home/hatter/Music<CR><tab>:mo<CR>
+map Ym <tab>:cd /home/hatter/Music<CR><tab>:co<CR> 
+"========================================================| Pictures
+map gpp :cd /home/hatter/Pictures<CR>
+map tpp <tab>:cd /home/hatter/Pictures<CR><tab>
+map Mpp <tab>:cd /home/hatter/Pictures<CR><tab>:mo<CR>
+map Ypp <tab>:cd /home/hatter/Pictures<CR><tab>:co<CR> 
+"========================================================| Pictures
+map gvv :cd /home/hatter/Downloads/videos<CR>
+map tvv <tab>:cd /home/hatter/Downloads/videos<CR><tab>
+map Mvv <tab>:cd /home/hatter/Downloads/videos<CR><tab>:mo<CR>
+map Yvv <tab>:cd /home/hatter/Downloads/videos<CR><tab>:co<CR> 
+"========================================================| /mnt
+map gmn :cd /mnt<CR>
+map tmn <tab>:cd /mnt<CR><tab>
+map Mmn <tab>:cd /mnt<CR><tab>:mo<CR>
+map Ymn <tab>:cd /mnt<CR><tab>:co<CR> 
+"========================================================| .local/bin
+map glb :cd /home/hatter/.local/bin<CR>
+map tlb <tab>:cd /home/hatter/.local/bin<CR><tab>
+map Mlb <tab>:cd /home/hatter/.local/bin<CR><tab>:mo<CR>
+map Ylb <tab>:cd /home/hatter/.local/bin<CR><tab>:co<CR> 
+"========================================================| .local/src
+map glr :cd /home/hatter/.local/src<CR>
+map tlr <tab>:cd /home/hatter/.local/src<CR><tab>
+map Mlr <tab>:cd /home/hatter/.local/src<CR><tab>:mo<CR>
+map Ylr <tab>:cd /home/hatter/.local/src<CR><tab>:co<CR> 
+"========================================================| .local/share
+map glh :cd /home/hatter/.local/share<CR>
+map tlh <tab>:cd /home/hatter/.local/share<CR><tab>
+map Mlh <tab>:cd /home/hatter/.local/share<CR><tab>:mo<CR>
+map Ylh <tab>:cd /home/hatter/.local/share<CR><tab>:co<CR> 
+"========================================================| .config
+map gcf :cd /home/hatter/.config<CR>
+map tcf <tab>:cd /home/hatter/.config<CR><tab>
+map Mcf <tab>:cd /home/hatter/.config<CR><tab>:mo<CR>
+map Ycf <tab>:cd /home/hatter/.config<CR><tab>:co<CR> 
+"========================================================| config files
+map cff :e /home/hatter/.config/shell/bm-files<CR> 
+map cfd :e /home/hatter/.config/shell/bm-dirs<CR> 
+map cfx :e /home/hatter/.config/x11/xresources<CR> 
+map cfv :e /home/hatter/.config/nvim/init.vim<CR> 
+map cfz :e /home/hatter/.config/zsh/.zshrc<CR> 
+map cfa :e /home/hatter/.config/shell/aliasrc<CR> 
+map cfp :e /home/hatter/.config/shell/profile<CR> 
+map cfe :e /home/hatter/.config/mutt/muttrc<CR> 
+map cfn :e /home/hatter/.config/newsboat/config<CR> 
+map cfu :e /home/hatter/.config/newsboat/urls<CR> 
+map cfmb :e /home/hatter/.config/ncmpcpp/bindings<CR> 
+map cfmc :e /home/hatter/.config/ncmpcpp/config<CR> 
+map cfs :e /home/hatter/.config/sxiv/exec/key-handler<CR> 

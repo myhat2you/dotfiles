@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# DMenu font and colorsceme
+font="$(xrdb -get dmenu.font)"
+color_bg="$(xrdb -get background)"
+color_fg="$(xrdb -get foreground)"
+color_g="$(xrdb -get color7)"
+color_r="$(xrdb -get color1)"
+colors="-nb $color_bg -nf $color_g -sb $color_r -sf $color_fg"
+# Split $colors into separate arguments for dmenu using `set --` and pass with "$@".
+set -- $colors
+
+# A dmenu wrapper script for system functions.
+export WM="dwm"
+case "$(readlink -f /sbin/init)" in
+	*systemd*) ctl='systemctl' ;;
+	*) ctl='loginctl' ;;
+esac
+
+wmpid(){ # This function is needed if there are multiple instances of the window manager.
+	tree="$(pstree -ps $$)"
+	tree="${tree#*$WM(}"
+	echo "${tree%%)*}"
+}
+
+case "$(printf " lock\n leave $WM\n renew $WM\n sleep\n hibernate\n reboot\n shutdown\n display off" | dmenu -fn $font $@ -i -p 'Action: ')" in
+	' lock') slock ;;
+	" leave $WM") kill -TERM "$(wmpid)" ;;
+	" renew $WM") kill -HUP "$(wmpid)" ;;
+	' hibernate') slock $ctl hibernate -i ;;
+	' sleep') slock $ctl suspend -i ;;
+	' reboot') $ctl reboot -i ;;
+	' shutdown') $ctl poweroff -i ;;
+	' display off') xset dpms force off ;;
+	*) exit 1 ;;
+esac

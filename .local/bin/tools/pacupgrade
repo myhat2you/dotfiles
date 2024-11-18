@@ -1,0 +1,13 @@
+#!/bin/sh
+
+printf "Beginning upgrade.\\n"
+
+yay -Syy || (echo "failed to sync"; exit 1)
+yay -Syu || (echo "failed to update"; exit 1)
+
+printf "\\nUpgrade complete.\\nPress <Enter> to exit window.\\n\\n"
+read -r _
+
+# reset sb-updates
+kill -37 $(pidof dwmblocks)
+source ~/.config/x11/xprofile
