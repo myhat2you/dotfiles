@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# Displays number of upgradeable packages.
+# For this to work, add this to the sudoers file
+# %wheel ALL=(ALL:ALL) NOPASSWD: /usr/bin/pacman -Sy
+# When clicked, it will run an upgrade via pacman.
+
+icon=""
+color_g="$(xrdb -get color2)"
+color_r="$(xrdb -get color9)"
+
+[[ -f /tmp/pacupdate ]] && cat /tmp/pacupdate || packages="$(pacman -Qu | grep -Fcv '[ignored]' | sed 's/^//;s/^0$/0/g')"
+
+sync(){ sudo pacman -Sy 2>/dev/null 1>/dev/null || notify-send "Error synchronizing updates." ; }
+
+case $BUTTON in
+	1) notify-send -a "button" "$icon Packages to Update" "$(/usr/bin/pacman -Qu)" ;;
+	2) setsid -f "$TERMINAL" -e pacupgrade ;;
+	3) notify-send -a "button" " Upgrade module" "\- Shows number of updates
+- Left click to show packages
+- Middle click to upgrade packages" ;;
+esac
+
+case $packages in
+	[0-0]) sync;;
+	[1-9]) echo -e "^c$color_g^$icon^d^ $packages";;
+	*)     echo -e "^c$color_r^$icon^d^ $packages";;
+esac
+

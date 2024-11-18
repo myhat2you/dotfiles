@@ -1,0 +1,25 @@
+#!/bin/sh
+
+icon=""
+color_b="$(xrdb -get color12)"
+color_o="$(xrdb -get color11)"
+color_p="$(xrdb -get color13)"
+color_r="$(xrdb -get color9)"
+
+read ram_now ram_max <<<$(free --giga | awk '/^Mem:/ {print $3, $2}')
+ram_low=$((ram_max/3))
+ram_med=$((ram_max/2))
+ram_high=$((3*ram_max/4))
+
+case $BUTTON in
+	1) notify-send -a "button" "$icon Memory hogs" "$(ps axch -o cmd:15,%mem --sort=-%mem | head)" ;;
+esac
+
+case $ram_now in
+	[0-$ram_low])         color=$color_b;;
+	[$ram_low-$ram_med])  color=$color_o;;
+	[$ram_med-$ram_high]) color=$color_p;;
+	[$ram_high-$ram_max]) color=$color_r;;
+esac
+
+echo -e "^c$color^$icon^d^ $ram_now"GB

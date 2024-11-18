@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Displays number of unread news items and an loading icon if updating.
+# When clicked, brings up `newsboat`.
+
+color_g="$(xrdb -get color2)"
+icon="📰"
+
+case $BUTTON in
+  1) setsid "$TERMINAL" -e newsboat ;;
+	2) setsid -f newsup >/dev/null && exit ;;
+  3) notify-send -a "button" "$icon News module" "\- Shows unread news items
+- Shows  if updating
+- Left click opens newsboat
+- Middle click syncs RSS feed" ;;
+esac
+
+[[ -f /tmp/newsupdate ]] && cat /tmp/newsupdate || unread="$(newsboat -x print-unread | awk '{print $1}')"
+
+[[ $unread > 0 ]] && printf "^c$color_g^$icon^d^ $unread"; 
