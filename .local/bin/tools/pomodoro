@@ -1,0 +1,70 @@
+#!/bin/sh
+
+WORK_DURATION=1500       # 25 minutes
+REST_DURATION=300        # 05 minutes
+LONG_REST_DURATION=1800  # 30 minutes
+CYCLES=4
+BAR_WIDTH=16
+
+send_notification() {
+  notify-send -a button "$1" "$2"
+}
+
+progress_bar() {
+  local total=$1
+  local start_time=$(date +%s)
+  local end_time=$((start_time + total))
+  local segment=$((total / BAR_WIDTH))
+
+  echo -n "|"
+  for i in $(seq 1 $BAR_WIDTH); do
+    now=$(date +%s)
+    sleep_time=$((segment - (now - start_time - ((i - 1) * segment))))
+    [ "$sleep_time" -gt 0 ] && sleep "$sleep_time"
+
+    echo -n "="
+  done
+  echo "|"
+}
+
+pomodoro_cycle() {
+  local cycle=1
+
+  while [ "$cycle" -le "$CYCLES" ]; do
+    # Work session
+    now=$(date +%s)
+    end=$((now + WORK_DURATION))
+    echo -e "|====| work |====|"
+    echo "|init:      $(date --date="@$now" +%H:%M)|"
+    echo "|stop:      $(date --date="@$end" +%H:%M)|"
+    progress_bar $WORK_DURATION
+    echo ""
+    send_notification " Pomodoro" "===================\n Time for a break! \n==================="
+
+    # Rest session
+    now=$(date +%s)
+    end=$((now + REST_DURATION))
+    echo -e "|----| rest |----|"
+    echo "|init:      $(date --date="@$now" +%H:%M)|"
+    echo "|stop:      $(date --date="@$end" +%H:%M)|"
+    progress_bar $REST_DURATION
+    echo ""
+    send_notification " Pomodoro" "===============\n Back to Work! \n==============="
+
+    cycle=$((cycle + 1))
+  done
+
+  # Long rest after cycles
+  now=$(date +%s)
+  end=$((now + LONG_REST_DURATION))
+  echo -e "|~~~~| REST |~~~~|"
+  echo "|init:      $(date --date="@$now" +%H:%M)|"
+  echo "|stop:      $(date --date="@$end" +%H:%M)|"
+  progress_bar $LONG_REST_DURATION
+  echo ""
+  send_notification " Pomodoro" "====================\n Take a long break! \n===================="
+}
+
+clear
+pomodoro_cycle
+
