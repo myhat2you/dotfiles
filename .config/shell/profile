@@ -5,6 +5,8 @@
 
 # Add all directories in `~/.local/bin` to $PATH
 export PATH="$PATH:$(find ~/.local/bin -type d | paste -sd ':' -)"
+# include $GOPATH/bin to PATH
+export PATH="$PATH:$HOME/.local/share/go/bin"
 
 unsetopt PROMPT_SP 2>/dev/null
 
