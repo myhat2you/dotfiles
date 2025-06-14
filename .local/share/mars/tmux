@@ -1,0 +1,52 @@
+ _
+| |_ _ __ ___  _   ___  __
+| __| '_ ` _ \| | | \ \/ /
+| |_| | | | | | |_| |>  <
+ \__|_| |_| |_|\__,_/_/\_\
+tmux is the terminal multiplexer
+
+PREFIX KEY: Ctrl-b (default)
+
+Navigation
+  c        Create new window
+  ,        Rename window
+  w        List windows
+  n / p    Next / previous window
+  <num>    Switch to window <num>
+  o        Switch to next pane
+  ;        Switch to last active pane
+  q        Show pane numbers
+
+Panes
+  %        Split vertically
+  "        Split horizontally
+  x        Kill current pane
+  z        Zoom/unzoom pane
+  <arrow>  Move between panes
+
+Resize Panes
+  Prefix + :resize-pane -D/-U/-L/-R <n>
+  or hold Prefix + arrow for nudging (if repeat enabled)
+
+Copy Mode
+  [        Enter copy mode
+  space    Start selection
+  enter    Copy to buffer
+  ]        Paste
+
+Session
+  tmux new -s name        New named session
+  tmux ls                 List sessions
+  tmux attach -t name     Attach to session
+  tmux kill-session -t name Kill session
+  d                       Detach from session
+
+Config & Help
+  :source-file ~/.tmux.conf  Reload config
+  ?                          Show key bindings
+  list-keys / list-commands  Discover more
+
+Tips
+- Use `tmux a` as a quick alias for `attach`
+- Use `set -g mouse on` in .tmux.conf for mouse support
+- Combine with fzf, ssh, and Vim for a productivity boost
