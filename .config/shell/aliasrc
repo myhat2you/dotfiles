@@ -90,7 +90,9 @@ alias \
 alias \
 	msf="tmux new-session -d 'msfconsole'" \
 	sshv="ssh hatter@139.162.198.179 -p 7950" \
-	sshw="ssh hatter@88.80.184.113 -p 8268"
+	sshw="ssh hatter@88.80.184.113 -p 8268" \
+  sshf="ssh fedhex@86.181.63.68 -p 49155" \
+  sshF="ssh fedhex@192.168.1.170 -p 49155"
 
 #-----------------------------------------------------------#
 # Misc                                                   #
