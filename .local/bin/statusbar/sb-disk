@@ -34,11 +34,13 @@ case $BUTTON in
 esac
 
 # Choose color based on disk usage percentage
-case $dperc in
-    [0-6]*) color=$color_b;; # Norm (00-70°C)
-    [7-8]*) color=$color_o;; # High (70-90°C)
-    *)      color=$color_r;; # Crit (>= 90°C)
-esac
+if [ "$dperc" -lt 70 ]; then
+    color=$color_b
+elif [ "$dperc" -lt 90 ]; then
+    color=$color_o
+else
+    color=$color_r
+fi
 
 # Output for status bar
 echo -e "^c$color^$icon^d^ $dused/$dsize"
