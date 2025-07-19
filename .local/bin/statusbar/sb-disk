@@ -11,13 +11,13 @@ color_r="$(xrdb -get color9)"
 get_disk_info() {
     printf "Drive\tUsed\tSize\tUsed\n"
     for drive in "${drives[@]::${#drives[@]}-1}"; do
-        df -H "$drive" | awk 'NR==2 {printf "%s\t%s\t%s\t%s\n", $6, $3, $2, $5}'
+        df -h "$drive" | awk 'NR==2 {printf "%s\t%s\t%s\t%s\n", $6, $3, $2, $5}'
     done
 }
 
 # Main drive location and data
 location=${1:-/home}
-read -r dused dsize dperc < <(df -H "$location" | awk 'NR==2 {print $3, $2, $5}' | sed 's/%//')
+read -r dused dsize dperc < <(df -h "$location" | awk 'NR==2 {print $3, $2, $5}' | sed 's/%//')
 
 # Ensure location is valid
 [ -d "$location" ] || exit
