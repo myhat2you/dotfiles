@@ -61,16 +61,16 @@ user_pref("browser.contentblocking.category", "strict");
  * [SETTING] Privacy & Security>Cookies and Site Data>Delete cookies and site data when Firefox is closed
  * [SETTING] to add site exceptions: Ctrl+I>Permissions>Cookies>Allow
  * [SETTING] to manage site exceptions: Options>Privacy & Security>Permissions>Settings ***/
-user_pref("network.cookie.lifetimePolicy", 2);
+user_pref("network.cookie.lifetimePolicy", 0);
 //Disabling disk cache is better, but try this if you like performance
    // user_pref("privacy.clearsitedata.cache.enabled", true);
 
 //Clear data on shutdown
-user_pref("privacy.sanitize.sanitizeOnShutdown", true);
+user_pref("privacy.sanitize.sanitizeOnShutdown", false);
 user_pref("privacy.clearOnShutdown.cache", true);     // [DEFAULT: true]
 user_pref("privacy.clearOnShutdown.downloads", true); // [DEFAULT: true]
 user_pref("privacy.clearOnShutdown.formdata", true);  // [DEFAULT: true]
-user_pref("privacy.clearOnShutdown.history", true);   // [DEFAULT: true]
+user_pref("privacy.clearOnShutdown.history", false);   // [DEFAULT: true]
 user_pref("privacy.clearOnShutdown.sessions", true);  // [DEFAULT: true]
 user_pref("privacy.clearOnShutdown.offlineApps", false); // [DEFAULT: false]
 user_pref("privacy.clearOnShutdown.cookies", false);
