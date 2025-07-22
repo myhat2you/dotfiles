@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# Get first connected display
+OUTPUT=$(xrandr --current | awk '/ connected/ {print $1; exit}')
+
+# Get current brightness as float
+CUR=$(xrandr --verbose | awk '/Brightness:/ {print $2; exit}')
+
+# Decide direction
+[[ $1 == up ]] && NEW=$(awk "BEGIN {print ($CUR + 0.05)}")
+[[ $1 == down ]] && NEW=$(awk "BEGIN {print ($CUR - 0.05)}")
+
+# Clamp between 0.1 and 1.0
+NEW=$(awk "BEGIN {print ($NEW < 0.1 ? 0.1 : ($NEW > 1 ? 1 : $NEW))}")
+
+# Apply new brightness
+xrandr --output "$OUTPUT" --brightness "$NEW"
