@@ -12,9 +12,10 @@ read ram_now ram_max <<<$(free --giga | awk '/^Mem:/ {print $3, $2}')
 ram_percentage=$((ram_now * 100 / ram_max))
 
 case $ram_percentage in
-    [0-4]*) color=$color_b ;; # Norm (00-50%) 
-    [5-7]*) color=$color_o ;; # High (50-80%)
-    *)      color=$color_r ;; # Crit (>= 80%) 
+    [0-9])      color=$color_b;; # Norm (00-10%) 
+    [1-4][0-9]) color=$color_b;; # Norm (10-50%) 
+    [5-7][0-9]) color=$color_o;; # High (50-80%)
+    *)          color=$color_r;; # Crit (>= 80%) 
 esac
 
 case $BUTTON in
