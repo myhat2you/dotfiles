@@ -1,5 +1,6 @@
 #!/bin/bash
 input="$1"
+client="laptop"
 
 # Define colors for output
 GREEN="\033[0;32m"
@@ -83,7 +84,7 @@ killswitch() {
     if [[ -z "$interface" || -z "$vpn_ip" || -z "$loc_ip" ]]; then
       notify-send -u critical " VPN" "Failed to initialize killswitch."
       echo -e "${RED}Failed to initialize VPN killswitch.${RESET}"
-      sudo systemctl stop openvpn-client@client
+      sudo systemctl stop openvpn-client@$client
       return 1
     fi
 
@@ -145,17 +146,17 @@ killswitch() {
 
 case "$input" in
   "start")
-    sudo systemctl start openvpn-client@client
+    sudo systemctl start openvpn-client@$client
     killswitch enable
     exit
     ;;
   "stop")
-    sudo systemctl stop openvpn-client@client
+    sudo systemctl stop openvpn-client@$client
     killswitch disable
     exit
     ;;
   "restart")
-    sudo systemctl restart openvpn-client@client
+    sudo systemctl restart openvpn-client@$client
     killswitch enable
     exit
     ;;
@@ -165,7 +166,7 @@ while true; do
   # Gather system information
   ip4="$(curl -4 ifconfig.me --silent --max-time 0.5 || echo "time-out")"
   ip6="$(curl -6 ifconfig.me --silent --max-time 0.5 || echo "disabled")"
-  vpn="$(systemctl is-active openvpn-client@client)"
+  vpn="$(systemctl is-active openvpn-client@$client)"
   dns="$(grep 'nameserver' /etc/resolv.conf | awk 'NR==1 {print $2}')"
   tun="$(nmcli device status | grep -q '^tun0.* connected' && echo "active" || echo "inactive")"
   ksw="$(verify_iptables && echo "active" || echo "inactive")"

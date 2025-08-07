@@ -1,5 +1,6 @@
 #!/bin/sh
 
+client="laptop"
 color_g="$(xrdb -get color2)"
 color_b="$(xrdb -get color12)"
 color_o="$(xrdb -get color11)"
@@ -8,7 +9,7 @@ color_r="$(xrdb -get color9)"
 ip_pub="$(curl -4 ifconfig.me --silent --connect-timeout 1)"
 ip_loc="$(ip -o -4 address show | awk 'NR==2 { gsub(/\/.*/, "", $4); print $4 }')"
 ip_dns="$(cat /etc/resolv.conf  | awk 'NR==2 {print $2}')"
-vpn_status="$(systemctl status openvpn-client@client 2>&1 | grep Active | awk '{print $2}')"
+vpn_status="$(systemctl status openvpn-client@$client 2>&1 | grep Active | awk '{print $2}')"
 
 # Check local and online connections
 if [[ ! $ip_loc ]]; then
