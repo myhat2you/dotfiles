@@ -43,6 +43,7 @@ alias \
 	bc="bc -ql" \
 	mkd="mkdir -pv" \
 	rsync="rsync -vrPlu" \
+  brave="brave --password-store=basic" \
 	yt="yt-dlp --embed-metadata -i" \
 	yta="yt -x -f bestaudio/best" \
 	ytt="yt --skip-download --write-thumbnail" \
@@ -89,10 +90,10 @@ alias \
 
 alias \
 	msf="tmux new-session -d 'msfconsole'" \
-	sshv="ssh hatter@139.162.198.179 -p 7950" \
+	sshv="ssh hex@172.233.53.225 -p 7950" \
 	sshw="ssh hatter@88.80.184.113 -p 8268" \
   sshf="ssh fedhex@192.168.1.170 -p 49155" \
-  sshF="ssh fedhex@86.181.63.68 -p 49155"
+  sshF="ssh fedhex@109.152.132.149 -p 49155"
 
 #-----------------------------------------------------------#
 # Misc                                                   #

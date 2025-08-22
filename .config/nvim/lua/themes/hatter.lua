@@ -6,10 +6,10 @@ local M = {}
 M.base_30 = {
 
   white         = "#c0caf5", -- line number highlight
-  darker_black  = "#181617", -- file manager background
-  black         = "#181617", -- selected mode foreground
+  darker_black  = "#040406", -- file manager background
+  black         = "#040406", -- selected mode foreground
   black2        = "#1f2336", -- folder highlight
-  one_bg        = "#24283B", -- background for floating windows and borders
+  one_bg        = "#14182B", -- background for floating windows and borders
   one_bg2       = "#414868", -- inactive statusline or split background
   one_bg3       = "#353b45", -- active split line or subtle highlights
   grey          = "#565E8A", -- line numbers
@@ -31,15 +31,15 @@ M.base_30 = {
   teal          = "#12DAB2", -- special highlights or tags
   orange        = "#EE6A66", -- replace mode or emphasized items
   cyan          = "#10D0E8", -- constants, parameters, or special values
-  statusline_bg = "#1C1C1C", -- status line background
-  lightbg       = "#24283B", -- statusbar background
+  statusline_bg = "#060608", -- status line background
+  lightbg       = "#14181B", -- statusbar background
   pmenu_bg      = "#4D6DD0", -- popup menu background or selection
   folder_bg     = "#5C88FF", -- folder icons or active items
 }
 
 M.base_16 = {
-  base00 = "#181617", -- default background
-  base01 = "#08080B", -- darker background
+  base00 = "#040406", -- default background
+  base01 = "#000000", -- darker background
   base02 = "#303648", -- selection background
   base03 = "#444b6a", -- comments or secondary text
   base04 = "#787c99", -- dark foreground

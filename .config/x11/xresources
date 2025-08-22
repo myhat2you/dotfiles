@@ -25,7 +25,7 @@ Nsxiv.bar.font:       monospace:size=12
 
 !! Hex colorscheme */
 *.foreground:    #F0F0F0
-*.background:    #181617
+*.background:    #040406
 *.color0:        #1C1C1C
 *.color8:        #6E6E6E
 *.color1:        #D42050

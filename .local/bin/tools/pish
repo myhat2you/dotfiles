@@ -1,0 +1,103 @@
+#!/bin/bash
+
+# ---- CONFIG ---- #
+LOCAL_IP="192.168.1.170"
+PUB_IP="86.177.230.202"
+VPN_IP="172.233.53.225"
+PI_PORT=49155
+PI_USER="fedhex"
+SSH_KEY="$HOME/.ssh/id_linode"
+SHARE_PATH="/home/fedhex/share"
+
+# ---- FLAGS ---- #
+SSH_OPTS="-i $SSH_KEY -p $PI_PORT"
+SCP_OPTS="-i $SSH_KEY -P $PI_PORT -r"
+
+# ---- UTILS ---- #
+show_help() {
+  cat <<EOF
+Simple utility for secure file transfers for my Raspberry Pi file server.
+All paths are relative to $SHARE_PATH unless absolute.
+
+Usage: pish [OPTION] [SOURCE] [DEST]
+  -g, --get    [remote file/dir] [dest path]
+  -p, --put    [local  file/dir] [dest path]
+  -r, --remove [remote file/dir]
+  -l, --list   [remote dir]
+  -o, --open   open a shell
+  -h, --help   display this message
+EOF
+}
+
+expand_remote_path() {
+  # If path is absolute, return as-is; else, prepend share path
+  [[ "$1" = /* ]] && echo "$1" || echo "$SHARE_PATH/$1"
+}
+
+error() { echo "Error: $1" >&2; show_help; exit 1; }
+
+detect_mode() {
+  MY_IP=$(curl -s --max-time 1 ifconfig.me -4)
+  if [[ "$MY_IP" == "$VPN_IP" ]]; then
+    HOST="$PUB_IP"
+  elif [[ "$MY_IP" == "$PUB_IP" ]]; then
+    HOST="$LOCAL_IP"
+  else
+    echo "Not connected via VPN or local network (Your IP: $MY_IP)"
+    exit 2
+  fi
+}
+
+# ---- OPERATIONS ---- #
+get_file() {
+  local remote_path
+  remote_path=$(expand_remote_path "$1")
+  local local_dest="${2:-.}"
+  scp $SCP_OPTS "$PI_USER@$HOST:$remote_path" "$local_dest"
+}
+
+put_file() {
+  local local_path="$1"
+  local remote_dest="${2:-$SHARE_PATH}"
+  remote_dest=$(expand_remote_path "$remote_dest")
+  scp $SCP_OPTS "$local_path" "$PI_USER@$HOST:$remote_dest"
+}
+
+list_dir() {
+  local remote_dir
+  remote_dir=$(expand_remote_path "${1:-}")
+  ssh $SSH_OPTS "$PI_USER@$HOST" "ls -lah \"$remote_dir\""
+}
+
+remove_file() {
+  local remote_path
+  remote_path=$(expand_remote_path "$1")
+  ssh $SSH_OPTS "$PI_USER@$HOST" "
+    if [[ -e \"$remote_path\" ]]; then
+      rm -rf \"$remote_path\" && echo 'Removed: $remote_path'
+    else
+      echo 'No such file or directory: $remote_path'
+    fi
+  "
+}
+
+open_shell() {
+  ssh $SSH_OPTS "$PI_USER@$HOST"
+}
+
+# ---- MAIN ---- #
+
+[[ $# -lt 1 ]] && show_help && exit 1
+CMD="$1"; shift
+
+detect_mode
+
+case "$CMD" in
+  -g|--get)    [[ $# -lt 1 ]] && error "No remote file/dir specified"; get_file "$@";;
+  -p|--put)    [[ $# -lt 1 ]] && error "No local file/dir specified"; put_file "$@";;
+  -l|--list)   list_dir "${1:-$SHARE_PATH}";;
+  -r|--remove|-R|--Remove) [[ $# -lt 1 ]] && error "No remote file/dir specified"; remove_file "$1";;
+  -o|--open)   open_shell;;
+  -h|--help)   show_help;;
+  *)           error "Unknown command: $CMD";;
+esac

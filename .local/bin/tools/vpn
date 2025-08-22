@@ -1,199 +1,241 @@
-#!/bin/bash
-input="$1"
-client="laptop"
+#!/usr/bin/env bash
+# vpnctl.sh — OpenVPN control + strict kill-switch for a local client
+# Requirements: openvpn, iptables (legacy or nft wrapper), iproute2, awk, sed, grep, notify-send (optional)
+set -Eeuo pipefail
 
-# Define colors for output
-GREEN="\033[0;32m"
-RED="\033[0;31m"
-CYAN="\033[0;36m"
-YELLOW="\033[1;33m"
-RESET="\033[0m"
+# =========================[ Config ]=========================
+client="laptop"                  # matches openvpn-client@...
+vpn_ip="172.233.53.225"          # matches vpn IP address
+vpn_if="tun0"                    # expected tunnel interface
+expected_dns="1.1.1.1"           # matches /etc/resolv.conf
+table_refresh=1                  # status refresh period
+notify_icon="network-vpn"        # icon name for notify-send (optional)
 
-# Function to check status and display output
-check() {
-    [[ "$3" == 1 ]] && status_symbol="${GREEN}[OK]${RESET}" || status_symbol="${RED}[FAIL]${RESET}"
-    printf "%-12s %-16s %-10b\n" "$1" "$2" "$status_symbol"
+# Colors
+GREEN="\033[0;32m"; RED="\033[0;31m"; CYAN="\033[0;36m"; YELLOW="\033[1;33m"; RESET="\033[0m"
+
+# iptables comment tag (used to find/remove our rules)
+KS_TAG="VPN_KS"
+
+# =====================[ Helpers / UX ]=======================
+ok()   { printf "%b" "${GREEN}[OK]${RESET}"; }
+fail() { printf "%b" "${RED}[FAIL]${RESET}"; }
+info() { printf "%b\n" "${CYAN}$*${RESET}"; }
+warn() { printf "%b\n" "${YELLOW}$*${RESET}"; }
+err()  { printf "%b\n" "${RED}$*${RESET}" >&2; }
+
+say() { printf "%b\n" "$*"; }
+note() { command -v notify-send >/dev/null && notify-send -i "$notify_icon" "$@"; }
+
+# run a privileged command without forcing the whole script under sudo
+SUDO="sudo -n"
+if ! $SUDO true 2>/dev/null; then
+  sudo -v || true
+fi
+
+# =====================[ Endpoint Parse ]=====================
+get_vpn_endpoint() {
+  local cfg="/etc/openvpn/client/${client}.conf"
+  # Read via sudo so root-only perms aren’t a problem
+  if ! $SUDO test -e "$cfg"; then
+    err "Missing OpenVPN config: $cfg"
+    return 1
+  fi
+
+  # First non-comment 'remote' line: remote HOST PORT [proto]
+  local host port proto
+  read -r host port proto < <($SUDO sed -n \
+    's/^\s*remote\s\+\([^ #]\+\)\s\+\([0-9]\+\)\(?:\s\+\(tcp\|udp\)\)\?.*/\1 \2 \3/p' \
+    "$cfg" | head -n1)
+
+  [[ -n "${host:-}" && -n "${port:-}" ]] || { err "Could not parse 'remote' from $cfg"; return 1; }
+  [[ -z "${proto:-}" ]] && proto="udp"
+
+  # Resolve BEFORE we flip policies; if resolution fails, we’ll use the hostname and warn.
+  local ip=""
+  ip="$(getent ahostsv4 "$host" | awk 'NR==1{print $1}')" || true
+  [[ -z "$ip" ]] && { warn "DNS resolution failed; using hostname '$host' for iptables insert."; ip="$host"; }
+
+  printf "%s %s %s\n" "$ip" "$port" "$proto"
 }
 
-ipv6_toggle(){
-  ipv6_path="/proc/sys/net/ipv6/conf"
+# =====================[ IPv6 Toggle ]========================
+ipv6_toggle() {
+  # Get current value
+  local p
+  if ! p="$($SUDO sysctl -n net.ipv6.conf.all.disable_ipv6 2>/dev/null)"; then
+    warn "Error: Failed to read IPv6 status."
+  fi
 
-  if [[ -d $ipv6_path ]]; then
-    for interface_path in "$ipv6_path"/*; do
-      interface=$(basename "$interface_path") # Extract the interface name
-      if [[ -w "$interface_path/disable_ipv6" ]]; then
-        echo "$1" | sudo tee "$interface_path/disable_ipv6" > /dev/null
-      fi
-    done
+  # Flip value
+  local v=$(( 1 - p ))
+
+  # Apply new value
+  if ! $SUDO sysctl -w net.ipv6.conf.all.disable_ipv6="$v" >/dev/null 2>&1; then
+    warn "Error: Failed to set IPv6 status."
   fi
 }
 
-verify_iptables() {
-  # Define expected rules
-  expected_rules=(
-    "-P INPUT DROP"
-    "-P FORWARD DROP"
-    "-P OUTPUT DROP"
-    "-N OUTPUT_VPN_KILL_SWITCH"
-    "-N RELATED_AND_ESTABLISHED"
-    "-A INPUT -j RELATED_AND_ESTABLISHED"
-    "-A INPUT -s.* -i.* -p udp -m udp --sport 1194 -j ACCEPT"
-    "-A OUTPUT -j OUTPUT_VPN_KILL_SWITCH"
-    "-A OUTPUT -o lo -j ACCEPT"
-    "-A OUTPUT -o tun+ -p icmp -j ACCEPT"
-    "-A OUTPUT -d.* -j ACCEPT"
-    "-A OUTPUT_VPN_KILL_SWITCH -p udp -m udp --dport 1194 -j ACCEPT"
-    "-A OUTPUT_VPN_KILL_SWITCH -o tun+ -j ACCEPT"
-    "-A OUTPUT_VPN_KILL_SWITCH -d.* -j ACCEPT"
-    "-A RELATED_AND_ESTABLISHED -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"
-    "-A RELATED_AND_ESTABLISHED -i lo -j ACCEPT"
-  )
+# ===================[ Kill-switch Rules ]====================
+ks_present() {
+  $SUDO iptables -S 2>/dev/null | grep -q -- "--comment $KS_TAG"
+}
 
-  # Check each rule
-  missing_rules=0
-  for rule in "${expected_rules[@]}"; do
-    sudo iptables -S | grep -- "$rule" > /dev/null || missing_rules=1
+ks_flush_all() {
+  $SUDO iptables -S | awk -v tag="$KS_TAG" '$0 ~ tag {print $0}' | \
+    sed -E 's/^-A /-D /' | while read -r line; do $SUDO iptables $line || true; done
+  for ch in $($SUDO iptables -S | awk '/-N .*VPN_KS/{print $2}'); do
+    $SUDO iptables -F "$ch" || true
+    $SUDO iptables -X "$ch" || true
   done
-
-  # Check if any rules are missing
-  [[ $missing_rules -eq 0 ]] && return 0 || return 1
+  $SUDO iptables -P INPUT ACCEPT
+  $SUDO iptables -P FORWARD ACCEPT
+  $SUDO iptables -P OUTPUT ACCEPT
+  ipv6_toggle
+  note "VPN" "Kill-switch disabled."
+  info "Kill-switch disabled."
 }
 
-killswitch() {
-  ks_state=$(sudo iptables -S OUTPUT | grep "VPN" )
-  [[ $1 == "enable"  && -z $ks_state ]] && {
-    interface="$(ip route show | awk '/default/ {print $5}')"
-    loc_ip="$(ip route show | grep "$interface" | awk '/proto kernel/ {print $1}')"
+ks_enable() {
+  if ks_present; then
+    info "Kill-switch already active."
+    return 0
+  fi
+  local ep_ip ep_port ep_proto
+  read -r ep_ip ep_port ep_proto < <(get_vpn_endpoint)
+  local wan_if; wan_if="$(ip route show default 0.0.0.0/0 | awk 'NR==1{print $5}')"
+  [[ -n "$wan_if" ]] || { err "Could not determine WAN interface."; return 1; }
+  warn "Initializing kill-switch…"
 
-    vpn_ip=""
-    max_retries=10
-    retry_count=0
+  ipv6_toggle
+  $SUDO iptables -F || true
+  $SUDO iptables -X || true
+  $SUDO iptables -t nat -F || true
+  $SUDO iptables -t nat -X || true
 
-    # Retry loop to ensure vpn_ip and loc_ip are set
-    while [[ -z "$vpn_ip" ]] && [[ $retry_count -lt $max_retries ]]; do
-      vpn_ip="$(ip route show | awk '/0.0.0.0\/1/ {print $3}')"
-      
-      echo -e "${YELLOW}Initializing kill switch...${RESET}"
-      if [[ -z "$interface" || -z "$vpn_ip" || -z "$loc_ip" ]]; then
-        retry_count=$((retry_count + 1))
-        sleep 1
-      fi
-    done
+  $SUDO iptables -P INPUT DROP
+  $SUDO iptables -P FORWARD DROP
+  $SUDO iptables -P OUTPUT DROP
 
-    # Check if variables were set, otherwise notify and exit
-    if [[ -z "$interface" || -z "$vpn_ip" || -z "$loc_ip" ]]; then
-      notify-send -u critical " VPN" "Failed to initialize killswitch."
-      echo -e "${RED}Failed to initialize VPN killswitch.${RESET}"
-      sudo systemctl stop openvpn-client@$client
-      return 1
-    fi
+  $SUDO iptables -A INPUT  -m conntrack --ctstate ESTABLISHED,RELATED -m comment --comment "$KS_TAG" -j ACCEPT
+  $SUDO iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -m comment --comment "$KS_TAG" -j ACCEPT
 
-    # disable IPv6
-    ipv6_toggle 1
+  $SUDO iptables -A INPUT  -i lo -m comment --comment "$KS_TAG" -j ACCEPT
+  $SUDO iptables -A OUTPUT -o lo -m comment --comment "$KS_TAG" -j ACCEPT
 
-    # Flush all chains, delete custom chains.
-    sudo iptables -F
-    sudo iptables -X
-    sudo iptables -t nat -F
-    sudo iptables -t nat -X
+  if [[ "$ep_proto" == "udp" ]]; then
+    $SUDO iptables -A OUTPUT -o "$wan_if" -p udp -d "$ep_ip" --dport "$ep_port" -m comment --comment "$KS_TAG" -j ACCEPT
+    $SUDO iptables -A INPUT  -i "$wan_if" -p udp -s "$ep_ip" --sport "$ep_port" -m comment --comment "$KS_TAG" -j ACCEPT
+  else
+    $SUDO iptables -A OUTPUT -o "$wan_if" -p tcp -d "$ep_ip" --dport "$ep_port" -m comment --comment "$KS_TAG" -j ACCEPT
+    $SUDO iptables -A INPUT  -i "$wan_if" -p tcp -s "$ep_ip" --sport "$ep_port" -m comment --comment "$KS_TAG" -j ACCEPT
+  fi
 
-    # Block all traffic as default.
-    sudo iptables --policy INPUT DROP
-    sudo iptables --policy FORWARD DROP
-    sudo iptables --policy OUTPUT DROP
+  $SUDO iptables -A OUTPUT -o "tun+" -m comment --comment "$KS_TAG" -j ACCEPT
+  $SUDO iptables -A OUTPUT -o "tun+" -p icmp -m comment --comment "$KS_TAG" -j ACCEPT
+  $SUDO iptables -A INPUT  -i "tun+" -m comment --comment "$KS_TAG" -j ACCEPT
 
-    # Block all IPv6 traffic.
-    sudo ip6tables --policy INPUT DROP
-    sudo ip6tables --policy FORWARD DROP
-    sudo ip6tables --policy OUTPUT DROP
-
-    # Allow related and established traffic.
-    sudo iptables -N RELATED_AND_ESTABLISHED
-    sudo iptables -A RELATED_AND_ESTABLISHED -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-    sudo iptables -A INPUT -j RELATED_AND_ESTABLISHED
-
-    # Let's allow the loopback device.
-    sudo iptables -A OUTPUT -o lo -j ACCEPT
-    sudo iptables -A RELATED_AND_ESTABLISHED  -i lo -j ACCEPT 
-
-    # Allow VPN traffic and ping.
-    sudo iptables -A OUTPUT -o tun+ -p icmp -j ACCEPT
-    sudo iptables -A OUTPUT -d "$loc_ip" -j ACCEPT
-
-    # VPN kill switch chain rules.
-    sudo iptables -N OUTPUT_VPN_KILL_SWITCH
-    sudo iptables -A OUTPUT_VPN_KILL_SWITCH -p udp --dport 1194 -j ACCEPT
-    sudo iptables -A OUTPUT_VPN_KILL_SWITCH -o tun+ -j ACCEPT
-    sudo iptables -A OUTPUT_VPN_KILL_SWITCH -d "$vpn_ip" -j ACCEPT
-    sudo iptables -A INPUT -j ACCEPT -s "$vpn_ip" -i "$interface" -p udp --sport 1194
-    sudo iptables -I OUTPUT -j OUTPUT_VPN_KILL_SWITCH
-
-    verify_iptables && notify-send " VPN" "Kill switch rules are active."
-
-  }
-  [[ $1 == "disable" && -n $ks_state ]] && {
-    # enable IPv6
-    ipv6_toggle 1
-    # Delete custom rules and chains.
-    sudo iptables -F
-    sudo iptables -X 
-    # Reset default policies.
-    sudo iptables -P INPUT ACCEPT
-    sudo iptables -P FORWARD ACCEPT 
-    sudo iptables -P OUTPUT ACCEPT 
-  }
+  note "VPN" "Kill-switch enabled."
+  info "Kill-switch enabled."
 }
 
-case "$input" in
-  "start")
-    sudo systemctl start openvpn-client@$client
-    killswitch enable
-    exit
-    ;;
-  "stop")
-    sudo systemctl stop openvpn-client@$client
-    killswitch disable
-    exit
-    ;;
-  "restart")
-    sudo systemctl restart openvpn-client@$client
-    killswitch enable
-    exit
-    ;;
+# =====================[ Service Control ]====================
+vpn_start() {
+  say "${YELLOW}Connecting to VPN...${RESET}"
+  $SUDO systemctl start "openvpn-client@${client}"
+  if systemctl is-active --quiet "openvpn-client@${client}"; then
+    say "${GREEN}VPN connected${RESET}"
+    note "VPN" "Connected (${client})"
+  else
+    say "${RED}WARNING: VPN failed to connect${RESET}"
+  fi
+}
+
+vpn_stop() {
+  say "${YELLOW}Disconnecting VPN profile '${client}'...${RESET}"
+  $SUDO systemctl stop "openvpn-client@${client}"
+  if ! systemctl is-active --quiet "openvpn-client@${client}"; then
+    say "${CYAN}VPN disconnected${CYAN}"
+    note "VPN" "Disconnected (${client})"
+  else
+    say "${RED}WARNING: VPN failed to stop${RESET}"
+  fi
+}
+
+vpn_restart() {
+  say "${YELLOW}Restarting VPN profile '${client}'...${RESET}"
+  $SUDO systemctl restart "openvpn-client@${client}"
+  if systemctl is-active --quiet "openvpn-client@${client}"; then
+    say "${GREEN}VPN restarted and connected${RESET}"
+    note "VPN" "Restarted (${client})"
+  else
+    say "${RED}WARNING: VPN failed to restart${RESET}"
+  fi
+}
+
+# =======================[ Status View ]======================
+check_line() {
+  local sym; [[ "$3" == 1 ]] && sym="$(ok)" || sym="$(fail)"
+  printf " %-12s %-15s %-10b\n" "$1" "$2" "$sym"
+}
+ks_verify() { ks_present && return 0 || return 1; }
+
+status_loop() {
+  local key
+  stty -echo -icanon time 0 min 0 2>/dev/null || true
+  while :; do
+    local ip4 ip6 vpn dns tun ksw
+    ip4="$(curl -4 -s --max-time 0.6 ifconfig.me || echo "time-out")"
+    ip6="$(curl -6 -s --max-time 0.6 ifconfig.me || echo "disabled")"
+    vpn="$(systemctl is-active --quiet "openvpn-client@${client}" 2>/dev/null && echo active || echo inactive)"
+    dns="$(grep -m1 '^nameserver' /etc/resolv.conf | awk '{print $2}' || echo "unknown")"
+    tun="$([ -d "/sys/class/net/$vpn_if" ] && echo active || echo inactive)"
+    ksw="$(ks_verify && echo "active" || echo "inactive")"
+
+    local ip4_ok ip6_ok vpn_ok dns_ok tun_ok ks_ok
+    [[ "$ip4" != "time-out" ]] && ip4_ok=1 || ip4_ok=0
+    [[ "$ip4" == $vpn_ip    ]] && ip4_ok=1 || ip4_ok=0
+    [[ "$ip6" == "disabled" ]] && ip6_ok=1 || ip6_ok=0; ip6="enabled"
+    [[ "$vpn" != "inactive" ]] && vpn_ok=1 || vpn_ok=0
+    [[ "$dns" == "$expected_dns" ]] && dns_ok=1 || dns_ok=0
+    [[ "$tun" != "inactive" ]] && tun_ok=1 || tun_ok=0
+    [[ "$ksw" != "inactive" ]] && ks_ok=1 || ks_ok=0
+
+    printf "%b\n" "${YELLOW}┌───────────────────────────────────┐${RESET}"
+    printf " %-12s %-15s %-10s\n" "SERVICE" "DETAILS" "STATUS"
+    printf "%b\n" "${YELLOW}├───────────────────────────────────┤${RESET}"
+    check_line "IP4 public" "$ip4" "$ip4_ok"
+    check_line "IP6 status" "$ip6" "$ip6_ok"
+    check_line "DNS server" "$dns" "$dns_ok"
+    check_line "VPN daemon" "$vpn" "$vpn_ok"
+    check_line "VPN tunnel" "$tun" "$tun_ok"
+    check_line "KillSwitch" "$ksw" "$ks_ok"
+    printf "%b\n" "${YELLOW}└───────────────────────────────────┘${RESET}"
+    say "Time: ${CYAN}$(date +%H:%M:%S)${RESET}   (press key to exit)"
+    read -r -t "$table_refresh" -n 1 key && break
+    tput ed 2>/dev/null || true
+    printf "\r"
+  done
+  stty sane 2>/dev/null || true
+}
+
+# =========================[ CLI ]============================
+usage() {
+  cat <<EOF
+Usage: $0 {start|stop|restart|status}
+  start       Start OpenVPN client and enable kill-switch
+  stop        Stop OpenVPN client and disable kill-switch
+  restart     Restart OpenVPN client (kill-switch stays enabled)
+  status      Live status table (press any key to exit)
+EOF
+}
+
+cmd="${1:-status}"
+case "$cmd" in
+  start)    ks_enable; vpn_start ;;
+  stop)     vpn_stop; ks_flush_all ;;
+  restart)  vpn_restart ;;
+  status)   status_loop ;;
+  *) usage; exit 1 ;;
 esac
 
-while true; do
-  # Gather system information
-  ip4="$(curl -4 ifconfig.me --silent --max-time 0.5 || echo "time-out")"
-  ip6="$(curl -6 ifconfig.me --silent --max-time 0.5 || echo "disabled")"
-  vpn="$(systemctl is-active openvpn-client@$client)"
-  dns="$(grep 'nameserver' /etc/resolv.conf | awk 'NR==1 {print $2}')"
-  tun="$(nmcli device status | grep -q '^tun0.* connected' && echo "active" || echo "inactive")"
-  ksw="$(verify_iptables && echo "active" || echo "inactive")"
-
-  # Evaluate statuses
-  ip4_status=$([[ $ip4 != "time-out"  ]] && echo 1 || echo 0)
-  ip6_status=$([[ $ip6 == "disabled"  ]] && echo 1 || echo 0)
-  vpn_status=$([[ $vpn != "inactive"  ]] && echo 1 || echo 0)
-  dns_status=$([[ $dns == "1.1.1.1"   ]] && echo 1 || echo 0)
-  tun_status=$([[ $tun != "inactive"  ]] && echo 1 || echo 0)
-  ksw_status=$([[ $ksw != "inactive"  ]] && echo 1 || echo 0)
-
-  # Display header
-  echo -e "${YELLOW}-------------------------------------${RESET}"
-  printf "%-12s %-16s %-10s\n" "SERVICE" "DETAILS" "STATUS"
-  echo -e "${YELLOW}-------------------------------------${RESET}"
-
-  # Display individual statuses
-  check "IP4 public" "$ip4" "$ip4_status"
-  check "IP6 status" "$ip6" "$ip6_status"
-  check "DNS server" "$dns" "$dns_status"
-  check "VPN daemon" "$vpn" "$vpn_status"
-  check "VPN tunnel" "$tun" "$tun_status"
-  check "KillSwitch" "$ksw" "$ksw_status"
-
-  # Footer with timestamp
-  echo -e "${YELLOW}-------------------------------------${RESET}"
-  echo -e "Time: ${CYAN}$(date +%H:%M:%S)${RESET}"
-  sleep 1s
-done
