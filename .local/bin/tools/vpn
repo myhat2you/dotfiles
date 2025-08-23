@@ -234,7 +234,7 @@ cmd="${1:-status}"
 case "$cmd" in
   start)    ks_enable; vpn_start ;;
   stop)     vpn_stop; ks_flush_all ;;
-  restart)  vpn_restart ;;
+  restart)  ks_flush_all; ks_enable; vpn_restart ;;
   status)   status_loop ;;
   *) usage; exit 1 ;;
 esac
